@@ -115,5 +115,6 @@ for iso in forbidden_isotopes:
     elif df.empty:
         remaining_forbidden_isotopes.append(iso)
 
-# print(f'Isotopes not existing in NIST file: {remaining_forbidden_isotopes}\n')
 print(f'Isotopes not found in any database: {remaining_isotopes2}, [{remaining_forbidden_isotopes}]\n')
+
+f1.close()
