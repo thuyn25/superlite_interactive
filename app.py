@@ -12,12 +12,8 @@ import pandas as pd
 from astropy import units as u
 from specutils import Spectrum1D
 import csv
-
-import streamlit as st
-import plotly.graph_objects as go
-import numpy as np
-import pandas as pd
 import plotly.express as px
+st.set_page_config(page_title="🚀 Supernova Spectroscopic Analyzer", layout="wide")
 
 # --- 1. Data Loading --- 
 @st.cache_data
@@ -40,9 +36,9 @@ COLOR_MAP = {species: colors[i % len(colors)] for i, species in enumerate(MAJOR_
 
 # --- 2. SIDEBAR CONTROLS ---
 st.sidebar.title('Controls')
-uploaded_file = st.sidebar.file_uploader("Upload Spectrum (lambda, flux)", type=["txt", "csv", "dat"])
+uploaded_file = st.sidebar.file_uploader(r"Upload Spectrum ($\lambda$, Flux)", type=["txt", "csv", "dat"])
 
-st.sidebar.markdown("### Global Shift")
+# st.sidebar.markdown("### Global Shift")
 # Added a global redshift to de-redshift the uploaded data
 global_z = st.sidebar.number_input("Global Redshift (z)", value=0.0, step=0.001, format="%.4f")
 
@@ -53,13 +49,25 @@ line_params = {}
 for i, species in enumerate(MAJOR_SPECIES):
     target_col = col1 if i % 2 == 0 else col2
     with target_col:
+        color = COLOR_MAP[species]
+        label_html = f"""
+            <div style="display: flex; align-items: center; margin-bottom: -10px;">
+                <div style="background-color: {color}; width: 6px; height: 18px; margin-right: 8px; border-radius: 2px;"></div>
+                <span style="font-weight: bold; font-size: 14px;">{species}</span>
+            </div>
+        """
+
+        st.markdown(label_html, unsafe_allow_html=True)
+        is_selected = st.checkbox("", key=f"check_{species}", value=(species in ["H", "H I"]))
+        
         # Display the species name in its assigned color
-        st.markdown(f"<span style='color:{COLOR_MAP[species]};font-weight:bold'>{species}</span>", unsafe_allow_html=True)
-        is_selected = st.checkbox("Show", key=f"check_{species}", value=(species == "H I" or species == "H"))
+        # st.markdown(f"<span style='color:{COLOR_MAP[species]};font-weight:bold'>{species}</span>", unsafe_allow_html=True)
+
+        # is_selected = st.checkbox("", key=f"check_{species}", value=(species == "H I" or species == "H"))
         
         if is_selected:
-            z_val = st.number_input(f'z ({species})', value=global_z, step=0.01, format="%.4f", key=f'z_{species}', label_visibility="collapsed")
-            v_val = st.number_input(f'v_exp ({species})', value=0, step=1000, format="%d", key=f'v_{species}', label_visibility="collapsed")
+            z_val = st.number_input(f'z = ', value=global_z, step=0.01, format="%.4f", key=f'z_{species}')
+            v_val = st.number_input(r'$v_{exp}$ = ', value=0, step=1000, format="%d", key=f'v_{species}')
             line_params[species] = {'z': z_val, 'v_exp': v_val}
         st.markdown("---")
 
@@ -77,6 +85,9 @@ st.title("🚀 Supernova Spectroscopic Analyzer")
 if uploaded_file:
     wav_rest, wav_obs, flux = load_data(uploaded_file, global_z)
 
+    y_min, y_max = flux.min(), flux.max()
+    y_padding = (y_max - y_min) * 0.15
+
     fig = go.Figure()
 
     # Plot the main spectrum
@@ -84,7 +95,21 @@ if uploaded_file:
         x=wav_rest, 
         y=flux, 
         name="Spectrum", 
+        showlegend=False,
         line=dict(color='white', width=1)
+    ))
+    fig.update_yaxes(showticklabels=False)  # Hide y-axis labels for cleaner look
+    
+    # 2. Ghost Trace (Forces Top Axis to appear)
+    fig.add_trace(go.Scatter(
+        x=wav_obs, 
+        y=flux, 
+        xaxis='x2', # THIS IS THE KEY: it links to your xaxis2 definition
+        name="Observed Frame",
+        marker=dict(opacity=0), # Makes it invisible
+        line=dict(width=0),     # No line
+        showlegend=False,       # Don't show in legend
+        hoverinfo='none'        # Don't show in hover
     ))
 
     vc = 299792.458 # km/s
@@ -112,30 +137,52 @@ if uploaded_file:
             # Add annotation for the species name
             if idx == 0:
                 fig.add_annotation(
-                    x=shifted_wav, y=1, yref="paper",
-                    text=species, font=dict(color=spec_color),
-                    showarrow=False, textangle=-90, yanchor="top"
+                    x=shifted_wav, y=1+0.00, yref="paper",
+                    text=species, font=dict(color=spec_color, size=18),
+                    showarrow=True, textangle=-90, yanchor="top", 
                 )
+
+    top_min = wav_rest.min() * (1 + global_z)
+    top_max = wav_rest.max() * (1 + global_z)
 
     # --- DUAL AXIS CONFIGURATION ---
     fig.update_layout(
         template="plotly_dark",
         height=700,
-        margin=dict(t=100),
+        margin=dict(t=100, b=40, l=10, r=10),
+        
         xaxis=dict(
-            title="Rest Wavelength (Å)",
-            range=[wav_rest.min(), wav_rest.max()]
+            title=dict(text="Rest Wavelength (Å)", font=dict(size=18), standoff=10),
+            tickfont=dict(size=14), # Size of the numbers on the axis
+            range=[wav_rest.min(), wav_rest.max()],
+            automargin=True,
+            # minor=dict(
+            #     ticklen=4, 
+            #     tickcolor="rgba(255,255,255,0.5)", 
+            #     showgrid=False
+            # ),
+            # ticks="inside", # Ensures major ticks are visible
+            # tickwidth=1.5
         ),
-        # Secondary axis (Observed Frame)
+        
+        # --- Secondary X Axis (Top) ---
         xaxis2=dict(
-            title="Observed Wavelength (Å)",
+            title=dict(text="Observed Wavelength (Å)", font=dict(size=18), standoff=10),
+            tickfont=dict(size=14),
             overlaying='x',
             side='top',
-            # This range reflects the actual values in the file
-            range=[wav_obs.min(), wav_obs.max()],
-            showgrid=False
+            range=[top_min, top_max],
+            showgrid=False,
+            # Add Minor Ticks here too
+            # minor=dict(
+            #     ticklen=10, 
+            #     tickcolor="rgba(255,255,255,0.5)", 
+            #     showgrid=False
+            # ),
+            # ticks="inside"
         ),
-        yaxis=dict(title="Flux"),
+        yaxis=dict(title=dict(text="Flux", font=dict(size=18)), tickfont=dict(size=14),
+                   range=[y_min, y_max + y_padding], automargin=True),
         hovermode="x unified"
     )
 
