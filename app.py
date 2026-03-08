@@ -165,6 +165,8 @@ if uploaded_files:
             tickfont=dict(size=14), # Size of the numbers on the axis
             range=[2000, 10000],
             automargin=True,
+            exponentformat="none",
+            showgrid=True
         ),
         
         # --- Secondary X Axis (Top) ---
@@ -172,7 +174,7 @@ if uploaded_files:
             title=dict(text="Observed Wavelength (Å)", font=dict(size=18), standoff=10),
             tickfont=dict(size=14),
             overlaying='x',
-            side='top',
+            side='top',exponentformat="none",
             showgrid=False,
         ),
         yaxis=dict(title=dict(text="Flux", font=dict(size=18)), tickfont=dict(size=14),
