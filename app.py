@@ -2,7 +2,9 @@
 author:        thuyn25 <thuyn27@lsu.edu>
 date:          2026-03-07 16:29:36
 
-    This is the main file for the superlite application. It serves as the entry point for the application and is responsible for creating interactive interface that allows users to input their spectra data, deredshift it, and visualize the results with line identification of major relevant species in supernovae spectra.
+    This is the main file for the superlite application. It serves as the entry point for the application and is responsible for 
+    creating interactive interface that allows users to input their spectra data, deredshift it, 
+    and visualize the results with line identification of major relevant species in supernovae spectra.
 '''
 
 import streamlit as st
@@ -44,7 +46,6 @@ if len(uploaded_files) > 5:
     st.sidebar.warning('Only the first 5 files will be processed.')
     uploaded_files = uploaded_files[:5]
 
-# st.sidebar.markdown("### Global Shift")
 # Added a global redshift to de-redshift the uploaded data
 global_z = st.sidebar.number_input("Global Redshift (z)", value=0.0, step=0.001, format="%.4f")
 
@@ -66,11 +67,6 @@ for i, species in enumerate(MAJOR_SPECIES):
         st.markdown(label_html, unsafe_allow_html=True)
         is_selected = st.checkbox("", key=f"check_{species}", value=(species in ["H", "H I"]))
         
-        # Display the species name in its assigned color
-        # st.markdown(f"<span style='color:{COLOR_MAP[species]};font-weight:bold'>{species}</span>", unsafe_allow_html=True)
-
-        # is_selected = st.checkbox("", key=f"check_{species}", value=(species == "H I" or species == "H"))
-        
         if is_selected:
             z_val = st.number_input(f'z = ', value=global_z, step=0.01, format="%.4f", key=f'z_{species}')
             v_val = st.number_input(r'$v_{exp}$ = ', value=0, step=1000, format="%d", key=f'v_{species}')
@@ -84,8 +80,7 @@ def load_data(file, z):
         wavelength_rest = data[0] / (1 + z)
         flux = data[1]
 
-        flux_norm = flux / np.median(flux)  # Normalize flux for better visualization
-        # Return both rest and original observed wavelengths for axis syncing
+        flux_norm = flux / np.median(flux) 
         return wavelength_rest, data[0], flux_norm
     except Exception as e:
         st.error(f"Error loading {file.name}: {e}")
@@ -114,21 +109,17 @@ if uploaded_files:
 
         all_wav_rest.extend([wav_rest.min(), wav_rest.max()])
         all_wav_obs.extend([wav_obs.min(), wav_obs.max()])
-        # all_flux.extend([flux.min(), flux.max()])
-    
-        # 2. Ghost Trace (Forces Top Axis to appear)
+        
         fig.add_trace(go.Scatter(
             x=wav_obs, 
             y=flux, 
-            xaxis='x2', # THIS IS THE KEY: it links to your xaxis2 definition
-            marker=dict(opacity=0), # Makes it invisible
-            line=dict(width=0),     # No line
-            showlegend=False,       # Don't show in legend
-            hoverinfo='none'        # Don't show in hover
+            xaxis='x2', 
+            marker=dict(opacity=0),
+            line=dict(width=0),   
+            showlegend=False,       
+            hoverinfo='none'      
         ))
 
-    # y_min, y_max = min(all_flux), max(all_flux)
-    # y_padding = (y_max - y_min) * 0.2  # Add
     global_rest_min, global_rest_max = min(all_wav_rest), max(all_wav_rest)
     global_obs_min, global_obs_max = min(all_wav_obs), max(all_wav_obs)
 
@@ -174,13 +165,6 @@ if uploaded_files:
             tickfont=dict(size=14), # Size of the numbers on the axis
             range=[2000, 10000],
             automargin=True,
-            # minor=dict(
-            #     ticklen=4, 
-            #     tickcolor="rgba(255,255,255,0.5)", 
-            #     showgrid=False
-            # ),
-            # ticks="inside", # Ensures major ticks are visible
-            # tickwidth=1.5
         ),
         
         # --- Secondary X Axis (Top) ---
@@ -189,15 +173,7 @@ if uploaded_files:
             tickfont=dict(size=14),
             overlaying='x',
             side='top',
-            # range=[global_obs_min, global_obs_max],
             showgrid=False,
-            # Add Minor Ticks here too
-            # minor=dict(
-            #     ticklen=10, 
-            #     tickcolor="rgba(255,255,255,0.5)", 
-            #     showgrid=False
-            # ),
-            # ticks="inside"
         ),
         yaxis=dict(title=dict(text="Flux", font=dict(size=18)), tickfont=dict(size=14),
                 automargin=True),
