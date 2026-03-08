@@ -1,1 +1,1 @@
-# superlite_interactive
+# Interactive Spectroscopic Analyzer
