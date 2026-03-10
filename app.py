@@ -40,14 +40,24 @@ SPECTRA_COLORS = px.colors.qualitative.Set1
 
 # --- 2. SIDEBAR CONTROLS ---
 st.sidebar.title('Controls')
-uploaded_files = st.sidebar.file_uploader(r"Upload Spectrum ($\lambda$, Flux)", type=["txt", "csv", "dat"], accept_multiple_files=True)
+uploaded_files = st.sidebar.file_uploader(r"Upload Spectrum ($\lambda$, Flux)", type=["txt", "csv", "dat", "ascii"], accept_multiple_files=True)
 
 if len(uploaded_files) > 5:
     st.sidebar.warning('Only the first 5 files will be processed.')
     uploaded_files = uploaded_files[:5]
 
 # Added a global redshift to de-redshift the uploaded data
-global_z = st.sidebar.number_input("Global Redshift (z)", value=0.0, step=0.001, format="%.4f")
+# global_z = st.sidebar.number_input("Global Redshift (z)", value=0.0, step=0.001, format="%.4f")
+file_redshifts = {}
+if uploaded_files:
+    st.sidebar.markdown("### Per-File Redshift")
+    for file in uploaded_files:
+        # We use the filename as part of the key to keep inputs unique
+        z_f = st.sidebar.number_input(f"z for {file.name}", value=0.0, step=0.001, format="%.4f", key=f"z_{file.name}")
+        file_redshifts[file.name] = z_f
+
+# 2. Global reference for Line Identification and Axis Syncing
+global_z = st.sidebar.number_input("Reference Redshift (for Lines)", value=0.0, step=0.001, format="%.4f")
 
 st.sidebar.markdown("### Line Identification")
 col1, col2 = st.sidebar.columns(2)
@@ -75,12 +85,20 @@ for i, species in enumerate(MAJOR_SPECIES):
 
 def load_data(file, z):
     try:
-        data = np.loadtxt(file, usecols=(0, 1), comments='#', unpack=True)
-        # Primary axis will be Rest Wavelength
-        wavelength_rest = data[0] / (1 + z)
-        flux = data[1]
+        file.seek(0)
+        # 1. Attempt to load skipping the first row (common for headers)
+        try:
+            data = np.loadtxt(file, usecols=(0, 1), comments='#', skiprows=1, unpack=True)
+        except (ValueError, TypeError):
+            # 2. Fallback: If skipping a row caused an error, try loading WITHOUT skipping
+            file.seek(0)
+            data = np.loadtxt(file, usecols=(0, 1), comments='#', skiprows=0, unpack=True)
 
-        flux_norm = flux / np.median(flux) 
+        wav_obs = data[0]
+        flux = data[1]
+        wavelength_rest = wav_obs / (1 + z)
+        f_median = np.median(flux)
+        flux_norm = flux / f_median if f_median != 0 else flux 
         return wavelength_rest, data[0], flux_norm
     except Exception as e:
         st.error(f"Error loading {file.name}: {e}")
@@ -91,10 +109,11 @@ st.title("🚀 Supernova Spectroscopic Analyzer")
 if uploaded_files:
     fig = go.Figure()
 
-    all_wav_rest, all_wav_obs= [], []
+    # all_wav_rest, all_wav_obs= [], []
 
     for idx, file in enumerate(uploaded_files):
-        wav_rest, wav_obs, flux = load_data(file, global_z)
+        current_z = file_redshifts[file.name]
+        wav_rest, wav_obs, flux = load_data(file, current_z)
 
         spec_color = SPECTRA_COLORS[idx % len(SPECTRA_COLORS)]
         # Plot the main spectrum
@@ -107,8 +126,8 @@ if uploaded_files:
         ))
         fig.update_yaxes(showticklabels=False)  # Hide y-axis labels for cleaner look
 
-        all_wav_rest.extend([wav_rest.min(), wav_rest.max()])
-        all_wav_obs.extend([wav_obs.min(), wav_obs.max()])
+        # all_wav_rest.extend([wav_rest.min(), wav_rest.max()])
+        # all_wav_obs.extend([wav_obs.min(), wav_obs.max()])
         
         fig.add_trace(go.Scatter(
             x=wav_obs, 
@@ -120,8 +139,8 @@ if uploaded_files:
             hoverinfo='none'      
         ))
 
-    global_rest_min, global_rest_max = min(all_wav_rest), max(all_wav_rest)
-    global_obs_min, global_obs_max = min(all_wav_obs), max(all_wav_obs)
+    # global_rest_min, global_rest_max = min(all_wav_rest), max(all_wav_rest)
+    # global_obs_min, global_obs_max = min(all_wav_obs), max(all_wav_obs)
 
     vc = 299792.458 # km/s
 
